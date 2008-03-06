@@ -24,20 +24,20 @@ namespace :backup do
       ActiveRecord::Base.establish_connection(ActiveRecord::Base.configurations[RAILS_ENV])
       ActiveRecord::Base.connection.tables.each do |table_name|
         i = "000"
-        FileUtils.mkdir_p("#{RAILS_ROOT}/backup/#{RAILS_ENV}/build_#{BUILD_NUMBER}/fixtures/") 
-
-        File.open("#{RAILS_ROOT}/backup/#{RAILS_ENV}/build_#{BUILD_NUMBER}/fixtures/#{table_name}.yml", 'w') do |file|
-          data = ActiveRecord::Base.connection.select_all(sql % table_name)
-          nb_record = data.size
-          
-          while i.to_i <  nb_record do
+        index_file = "000"
+        FileUtils.mkdir_p("#{RAILS_ROOT}/backup/#{RAILS_ENV}/build_#{BUILD_NUMBER}/fixtures/#{table_name}")
+        data = ActiveRecord::Base.connection.select_all(sql % table_name)
+        nb_record = data.size
+        while i.to_i <  nb_record do
+          File.open("#{RAILS_ROOT}/backup/#{RAILS_ENV}/build_#{BUILD_NUMBER}/fixtures/#{table_name}/#{index_file}.yml", 'w') do |file|
             file.write data[i.to_i, 100].inject({}) { |hash, record|
               hash["#{table_name}_#{i.succ!}"] = record
               hash
-            }.to_yaml[5..-1]
-            # Delete the "--- \n" part in top of all yaml return
+            }.to_yaml
           end
+          index_file.succ!
         end
+
       end
     end
     
@@ -98,8 +98,35 @@ namespace :backup do
         @build     = ENV['BUILD'] || BUILD_NUMBER
         @env       = ENV['DUMP_ENV'] || RAILS_ENV
         require 'active_record/fixtures'
-        Dir.glob(File.join(RAILS_ROOT, "backup/#{@env}/build_#{@build}/", 'fixtures', '*.yml')).each do |fixture_file|
-          Fixtures.create_fixtures("#{RAILS_ROOT}/backup/#{@env}/build_#{@build}/fixtures", File.basename(fixture_file, '.yml'))
+        build_directory = "backup/#{@env}/build_#{@build}/"
+        connection = ActiveRecord::Base.connection
+        Dir.glob(File.join(RAILS_ROOT, build_directory, 'fixtures', '*')).each do |fixture_directory|
+          table_name = fixture_directory.split('/').last
+          Dir.glob(File.join(fixture_directory, '*.yml')).each do |fixture_file|
+            yaml_string = ""
+            yaml_string << IO.read(fixture_file)
+
+            if yaml = YAML::load(yaml_string)
+              # If the file is an ordered map, extract its children.
+              yaml_value =
+                if yaml.respond_to?(:type_id) && yaml.respond_to?(:value)
+                  yaml.value
+                else
+                  [yaml]
+                end
+
+              yaml_value.each do |fixture|
+                fixture.each do |name, data|
+                  unless data
+                    raise Fixture::FormatError, "Bad data for #{@class_name} fixture named #{name} (nil)"
+                  end
+
+                  fix = Fixture.new(data, {})
+                  connection.insert_fixture(fix, table_name)
+                end
+              end
+            end
+          end
         end
       end
       
