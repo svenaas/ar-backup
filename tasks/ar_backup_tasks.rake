@@ -53,6 +53,7 @@ namespace :backup do
           next if data.size < 1
           
           file.write data[0].keys.join(', ')
+          file.write "\n"
 
           # Define only for create in CSV fixtures
           class NilClass
@@ -63,6 +64,7 @@ namespace :backup do
 
           data.each { |record|
             file.write record.values.join(', ')
+            file.write "\n"
           }
         end
       end
@@ -81,15 +83,34 @@ namespace :backup do
       desc 'create a backup folder containing your db schema and content data (see backup/{env}/build_{build number})'
       task :dump => ['backup:db:extract_content', 'backup:db:extract_schema']
       
-      desc 'load your backed up data from a previous build. rake backup:db:load BUILD=1182 or rake backup:db:load BUILD=1182 DUMP_ENV=production'
-      task :load => :environment do
+      desc 'create a backup folder containing your db schema and content data in CSV (see backup/{env}/build_{build number})'
+      task :dump_csv => ['backup:db:extract_content_csv', 'backup:db:extract_schema']
+
+      desc 'load the schema from a previous build. rake backup:db:load_schema BUILD=1182 or rake backup:db:load_schema BUILD=1182 DUMP_ENV=production'
+      task :load_schema => :environment do
         @build     = ENV['BUILD'] || BUILD_NUMBER
         @env       = ENV['DUMP_ENV'] || RAILS_ENV
         load("#{RAILS_ROOT}/backup/#{@env}/build_#{@build}/schema/schema.rb")
-
+      end
+      
+      desc 'load your backed up data from a previous build. rake backup:db:load BUILD=1182 or rake backup:db:load BUILD=1182 DUMP_ENV=production'
+      task :load => :load_schema do
+        @build     = ENV['BUILD'] || BUILD_NUMBER
+        @env       = ENV['DUMP_ENV'] || RAILS_ENV
         require 'active_record/fixtures'
         Dir.glob(File.join(RAILS_ROOT, "backup/#{@env}/build_#{@build}/", 'fixtures', '*.yml')).each do |fixture_file|
           Fixtures.create_fixtures("#{RAILS_ROOT}/backup/#{@env}/build_#{@build}/fixtures", File.basename(fixture_file, '.yml'))
+        end
+      end
+      
+      desc 'load your backed up data from a previous build. rake backup:db:load BUILD=1182 or rake backup:db:load BUILD=1182 DUMP_ENV=production'
+      task :load_csv => :load_schema do
+        @build     = ENV['BUILD'] || BUILD_NUMBER
+        @env       = ENV['DUMP_ENV'] || RAILS_ENV
+        require 'active_record/fixtures'
+        Dir.glob(File.join(RAILS_ROOT, "backup/#{@env}/build_#{@build}/", 'fixtures', '*.csv')).each do |fixture_file|
+          puts "#{fixture_file}"
+          Fixtures.create_fixtures("#{RAILS_ROOT}/backup/#{@env}/build_#{@build}/fixtures", File.basename(fixture_file, '.csv'))
         end
       end
 
