@@ -40,6 +40,33 @@ namespace :backup do
         end
       end
     end
+    
+    desc 'Create CSV fixtures from your DB content'
+    task :extract_content_csv => :environment do
+      sql  = "SELECT * FROM %s"
+      ActiveRecord::Base.establish_connection(ActiveRecord::Base.configurations[RAILS_ENV])
+      ActiveRecord::Base.connection.tables.each do |table_name|
+        FileUtils.mkdir_p("#{RAILS_ROOT}/backup/#{RAILS_ENV}/build_#{BUILD_NUMBER}/fixtures/") 
+
+        File.open("#{RAILS_ROOT}/backup/#{RAILS_ENV}/build_#{BUILD_NUMBER}/fixtures/#{table_name}.csv", 'w') do |file|
+          data = ActiveRecord::Base.connection.select_all(sql % table_name)
+          next if data.size < 1
+          
+          file.write data[0].keys.join(', ')
+
+          # Define only for create in CSV fixtures
+          class NilClass
+            def to_s
+              'nil'
+            end
+          end
+
+          data.each { |record|
+            file.write record.values.join(', ')
+          }
+        end
+      end
+    end
 
       desc 'Dump the db schema'
       task :extract_schema => :environment do
