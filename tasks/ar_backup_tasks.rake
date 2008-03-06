@@ -24,13 +24,13 @@ namespace :backup do
       ActiveRecord::Base.establish_connection(ActiveRecord::Base.configurations[RAILS_ENV])
       ActiveRecord::Base.connection.tables.each do |table_name|
         i = "000"
-        index_file = "000"
+        index_file = "0000"
         FileUtils.mkdir_p("#{RAILS_ROOT}/backup/#{RAILS_ENV}/build_#{BUILD_NUMBER}/fixtures/#{table_name}")
         data = ActiveRecord::Base.connection.select_all(sql % table_name)
         nb_record = data.size
         while i.to_i <  nb_record do
           File.open("#{RAILS_ROOT}/backup/#{RAILS_ENV}/build_#{BUILD_NUMBER}/fixtures/#{table_name}/#{index_file}.yml", 'w') do |file|
-            file.write data[i.to_i, 100].inject({}) { |hash, record|
+            file.write data[i.to_i, 1000].inject({}) { |hash, record|
               hash["#{table_name}_#{i.succ!}"] = record
               hash
             }.to_yaml
