@@ -6,10 +6,15 @@ namespace :backup do
     # This function is inside the rake task so we can use it with sake
     def get_build_number
       begin
-        f = File.open "#{RAILS_ROOT}/.svn/entries"
-        # The revision information is on 4 lines in .svn/entries
-        3.times {f.gets}
-        f.gets.chomp
+        if File.exists? "#{RAILS_ROOT}/.svn/entries}"
+          f = File.open "#{RAILS_ROOT}/.svn/entries"
+          # The revision information is on 4 lines in .svn/entries
+          3.times {f.gets}
+          f.gets.chomp
+        elsif File.exists? "#{RAILS_ROOT}/.git/refs/heads/master"
+          f = File.open "#{RAILS_ROOT}/.git/refs/heads/master"
+          f.gets.chomp
+        end 
       rescue
         'x'
       end
